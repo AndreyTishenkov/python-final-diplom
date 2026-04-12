@@ -1324,6 +1324,102 @@
           ]
         }
       ]
+    },
+    {
+      "name": "8. Экспорт товаров",
+      "item": [
+        {
+          "name": "8.1 Экспорт в JSON (все товары)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/products/export/json/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "products", "export", "json"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8.2 Экспорт в YAML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/products/export/yaml/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "products", "export", "yaml"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8.3 Экспорт в CSV",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/products/export/csv/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "products", "export", "csv"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8.4 Экспорт с фильтрацией",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/products/export/json/?shop_id=1&category_id=1&min_price=1000&in_stock=true",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "products", "export", "json"],
+              "query": [
+                {"key": "shop_id", "value": "1"},
+                {"key": "category_id", "value": "1"},
+                {"key": "min_price", "value": "1000"},
+                {"key": "in_stock", "value": "true"}
+              ]
+            },
+            "description": "Экспорт с фильтрацией по магазину, категории, цене и наличию"
+          },
+          "response": []
+        },
+        {
+          "name": "8.5 Расширенный экспорт (с аналитикой)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{auth_token_shop}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8000/api/v1/products/export/json/?detailed=true",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "v1", "products", "export", "json"],
+              "query": [
+                {"key": "detailed", "value": "true"}
+              ]
+            },
+            "description": "Расширенный экспорт для магазина (требуется авторизация) - включает статистику по заказам"
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [

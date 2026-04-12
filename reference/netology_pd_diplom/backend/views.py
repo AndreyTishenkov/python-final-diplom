@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import IntegrityError
 from django.db.models import Q, Sum, F
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
 from requests import get
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import ListAPIView
@@ -14,11 +14,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ujson import loads as load_json
 from yaml import load as load_yaml, Loader
+import json  # Добавлен импорт json
+import csv   # Добавлен импорт csv
+import os
+from datetime import datetime  # Добавлен для работы с датами
+from django.utils import timezone
 
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
-    Contact, ConfirmEmailToken
+    Contact, ConfirmEmailToken, User
+
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
-    OrderItemSerializer, OrderSerializer, ContactSerializer
+    OrderItemSerializer, OrderSerializer, ContactSerializer, ProductExportSerializer, ProductExportFullSerializer
+
 from backend.signals import new_user_registered, new_order
 
 
@@ -736,3 +743,374 @@ class OrderView(APIView):
                         return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
+
+
+# Импорт задач Celery
+try:
+    from backend.tasks import async_export_products
+    CELERY_AVAILABLE = True
+except ImportError:
+    CELERY_AVAILABLE = False
+    async_export_products = None
+
+
+class ProductExportView(APIView):
+    """
+    Класс для экспорта товаров в различных форматах
+
+    Поддерживаемые форматы:
+    - json (по умолчанию)
+    - yaml
+    - csv
+
+    Параметры фильтрации:
+    - shop_id: ID магазина
+    - category_id: ID категории
+    - min_price: минимальная цена
+    - max_price: максимальная цена
+    - in_stock: только товары в наличии (true/false)
+    - format: формат выдачи (json/yaml/csv)
+    """
+
+    def get(self, request, *args, **kwargs):
+        """
+        Экспорт товаров с фильтрацией
+        """
+        # Проверяем права доступа (только для авторизованных магазинов)
+        if request.user.is_authenticated and request.user.type == 'shop':
+            # Магазин видит только свои товары
+            queryset = ProductInfo.objects.filter(shop__user_id=request.user.id)
+        else:
+            # Публичный экспорт - только активные магазины
+            queryset = ProductInfo.objects.filter(shop__state=True)
+
+        # Применяем фильтры
+        shop_id = request.query_params.get('shop_id')
+        category_id = request.query_params.get('category_id')
+        min_price = request.query_params.get('min_price')
+        max_price = request.query_params.get('max_price')
+        in_stock = request.query_params.get('in_stock')
+
+        if shop_id:
+            queryset = queryset.filter(shop_id=shop_id)
+
+        if category_id:
+            queryset = queryset.filter(product__category_id=category_id)
+
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+
+        if in_stock and in_stock.lower() == 'true':
+            queryset = queryset.filter(quantity__gt=0)
+
+        # Выбираем формат экспорта
+        export_format = kwargs.get('format', request.query_params.get('format', 'json')).lower()
+
+        # Определяем тип экспорта (простой или расширенный)
+        detailed = request.query_params.get('detailed', 'false').lower() == 'true'
+
+        if detailed:
+            serializer = ProductExportFullSerializer(queryset, many=True)
+        else:
+            serializer = ProductExportSerializer(queryset, many=True)
+
+        # Экспорт в зависимости от формата
+        if export_format == 'yaml':
+            return self.export_yaml(serializer.data, request)
+        elif export_format == 'csv':
+            return self.export_csv(queryset, request, detailed)
+        else:
+            return self.export_json(serializer.data, request)
+
+    def export_json(self, data, request):
+        """Экспорт в JSON"""
+        response = HttpResponse(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            content_type='application/json'
+        )
+        response['Content-Disposition'] = f'attachment; filename="products_export_{timezone.now().date()}.json"'
+        return response
+
+    def export_yaml(self, data, request):
+        """Экспорт в YAML"""
+        yaml_data = yaml.dump(
+            data,
+            allow_unicode=True,
+            default_flow_style=False,
+            sort_keys=False
+        )
+        response = HttpResponse(yaml_data, content_type='application/x-yaml')
+        response['Content-Disposition'] = f'attachment; filename="products_export_{timezone.now().date()}.yaml"'
+        return response
+
+    def export_csv(self, queryset, request, detailed=False):
+        """Экспорт в CSV"""
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="products_export_{timezone.now().date()}.csv"'
+
+        writer = csv.writer(response)
+
+        if detailed:
+            # Заголовки для расширенного экспорта
+            writer.writerow([
+                'ID', 'External ID', 'Название товара', 'Категория', 'Модель',
+                'Магазин', 'Количество', 'Цена', 'РРЦ', 'Заказано', 'Выручка', 'Параметры'
+            ])
+
+            for item in queryset:
+                # Собираем параметры в строку
+                params = '; '.join([f"{p.parameter.name}: {p.value}" for p in item.product_parameters.all()])
+
+                writer.writerow([
+                    item.id,
+                    item.external_id,
+                    item.product.name,
+                    item.product.category.name,
+                    item.model,
+                    item.shop.name,
+                    item.quantity,
+                    item.price,
+                    item.price_rrc,
+                    self.get_total_ordered(item),
+                    self.get_revenue(item),
+                    params
+                ])
+        else:
+            # Заголовки для простого экспорта
+            writer.writerow([
+                'ID', 'External ID', 'Название товара', 'Категория', 'Модель',
+                'Магазин', 'Количество', 'Цена', 'РРЦ', 'Параметры'
+            ])
+
+            for item in queryset:
+                # Собираем параметры в строку
+                params = '; '.join([f"{p.parameter.name}: {p.value}" for p in item.product_parameters.all()])
+
+                writer.writerow([
+                    item.id,
+                    item.external_id,
+                    item.product.name,
+                    item.product.category.name,
+                    item.model,
+                    item.shop.name,
+                    item.quantity,
+                    item.price,
+                    item.price_rrc,
+                    params
+                ])
+
+        return response
+
+    def get_total_ordered(self, obj):
+        """Вспомогательный метод для подсчета заказов"""
+        from django.db.models import Sum
+        total = obj.ordered_items.aggregate(total=Sum('quantity'))['total']
+        return total or 0
+
+    def get_revenue(self, obj):
+        """Вспомогательный метод для подсчета выручки"""
+        from django.db.models import Sum, F
+        revenue = obj.ordered_items.aggregate(
+            total=Sum(F('quantity') * F('product_info__price'))
+        )['total']
+        return revenue or 0
+
+
+class AsyncProductExportView(APIView):
+    """
+    Асинхронный экспорт товаров с использованием Celery
+
+    Позволяет экспортировать большие объемы данных без блокировки сервера.
+    Результат экспорта отправляется на email пользователя.
+
+    Пример запроса:
+    POST /api/v1/products/export/async/
+    {
+        "format": "json",
+        "shop_id": 1,
+        "category_id": 2,
+        "min_price": 1000,
+        "in_stock": true
+    }
+    """
+
+    def post(self, request, *args, **kwargs):
+        """
+        Запуск асинхронного экспорта
+        """
+        # Проверяем авторизацию
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+
+        # Проверяем формат экспорта
+        export_format = request.data.get('format', 'json')
+        if export_format not in ['json', 'yaml', 'csv']:
+            return JsonResponse({
+                'Status': False,
+                'Errors': 'Неподдерживаемый формат. Используйте: json, yaml, csv'
+            })
+
+        # Собираем фильтры из запроса
+        filters = {
+            'shop_id': request.data.get('shop_id'),
+            'category_id': request.data.get('category_id'),
+            'min_price': request.data.get('min_price'),
+            'max_price': request.data.get('max_price'),
+            'in_stock': request.data.get('in_stock'),
+        }
+        # Убираем None значения
+        filters = {k: v for k, v in filters.items() if v is not None}
+
+        # Проверяем, доступен ли Celery
+        try:
+            # Запускаем асинхронную задачу
+            task = async_export_products.delay(
+                user_id=request.user.id,
+                export_format=export_format,
+                filters=filters
+            )
+
+            return JsonResponse({
+                'Status': True,
+                'Task ID': task.id,
+                'Message': 'Экспорт запущен. Результат будет отправлен на email.',
+                'Format': export_format,
+                'Filters': filters
+            })
+        except Exception as e:
+            return JsonResponse({
+                'Status': False,
+                'Error': f'Ошибка запуска задачи: {str(e)}. Убедитесь, что Celery worker запущен.'
+            }, status=500)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Проверка статуса асинхронной задачи
+        """
+        task_id = request.query_params.get('task_id')
+        if not task_id:
+            return JsonResponse({
+                'Status': False,
+                'Errors': 'Не указан task_id. Добавьте параметр ?task_id=...'
+            })
+
+        try:
+            from celery.result import AsyncResult
+            task = AsyncResult(task_id)
+
+            if task.ready():
+                result = task.result
+                if result and result.get('status') == 'success':
+                    return JsonResponse({
+                        'Status': True,
+                        'Ready': True,
+                        'Success': True,
+                        'Result': result,
+                        'Message': f"Экспорт завершен. Файл: {result.get('filename')}"
+                    })
+                else:
+                    return JsonResponse({
+                        'Status': True,
+                        'Ready': True,
+                        'Success': False,
+                        'Error': result.get('error', 'Unknown error') if result else 'No result'
+                    })
+            else:
+                return JsonResponse({
+                    'Status': True,
+                    'Ready': False,
+                    'Message': 'Задача еще выполняется. Попробуйте позже.'
+                })
+        except Exception as e:
+            return JsonResponse({
+                'Status': False,
+                'Error': f'Ошибка проверки статуса: {str(e)}'
+            }, status=500)
+
+
+class DownloadExportFileView(APIView):
+    """
+    Скачивание файла экспорта
+
+    Пример запроса:
+    GET /api/v1/products/export/download/export_user_email_20240101_120000.json
+    """
+
+    def get(self, request, filename, *args, **kwargs):
+        """
+        Скачивание файла по имени
+        """
+        # Проверяем авторизацию
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Log in required'}, status=403)
+
+        # Безопасность: проверяем, что файл принадлежит пользователю
+        user_email_clean = request.user.email.replace('@', '_')
+        if not filename.startswith(f'export_{user_email_clean}'):
+            return JsonResponse({
+                'Status': False,
+                'Error': 'Access denied. Этот файл принадлежит другому пользователю.'
+            }, status=403)
+
+        # Формируем путь к файлу
+        filepath = os.path.join(settings.EXPORT_FILES_ROOT, filename)
+
+        # Проверяем существование файла
+        if not os.path.exists(filepath):
+            return JsonResponse({
+                'Status': False,
+                'Error': 'File not found. Возможно, файл был удален (хранится 7 дней).'
+            }, status=404)
+
+        # Отдаем файл на скачивание
+        try:
+            response = FileResponse(
+                open(filepath, 'rb'),
+                content_type='application/octet-stream'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            return JsonResponse({
+                'Status': False,
+                'Error': f'Ошибка при скачивании файла: {str(e)}'
+            }, status=500)
+
+
+# ========== КОНТРОЛЛЕР ДЛЯ ПРОВЕРКИ СТАТУСА CELERY ==========
+
+class CeleryStatusView(APIView):
+    """
+    Проверка статуса Celery worker
+    """
+
+    def get(self, request, *args, **kwargs):
+        """
+        Проверяет, запущен ли Celery worker
+        """
+        try:
+            from celery.result import AsyncResult
+            # Создаем тестовую задачу
+            test_task = async_export_products.delay(
+                user_id=request.user.id if request.user.is_authenticated else 1,
+                export_format='json',
+                filters={'test': True}
+            )
+            # Отменяем тестовую задачу
+            test_task.revoke(terminate=True)
+
+            return JsonResponse({
+                'Status': True,
+                'Celery': 'Running',
+                'Message': 'Celery worker активен и готов к работе'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'Status': False,
+                'Celery': 'Not running',
+                'Error': str(e),
+                'Message': 'Celery worker не запущен. Запустите: celery -A netology_pd_diplom worker --pool=eventlet -l info'
+            }, status=503)

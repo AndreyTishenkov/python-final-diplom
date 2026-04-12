@@ -3,7 +3,8 @@ from django_rest_passwordreset.views import reset_password_request_token, reset_
 
 from backend.views import PartnerUpdate, RegisterAccount, LoginAccount, CategoryView, ShopView, ProductInfoView, \
     BasketView, \
-    AccountDetails, ContactView, OrderView, PartnerState, PartnerOrders, ConfirmAccount
+    AccountDetails, ContactView, OrderView, PartnerState, PartnerOrders, ConfirmAccount, \
+    ProductExportView, AsyncProductExportView, DownloadExportFileView
 
 app_name = 'backend'
 urlpatterns = [
@@ -23,4 +24,11 @@ urlpatterns = [
     path('basket', BasketView.as_view(), name='basket'),
     path('order', OrderView.as_view(), name='order'),
 
+    # Экспорт товаров
+    path('products/export/', ProductExportView.as_view(), name='product-export'),
+    path('products/export/<str:format>/', ProductExportView.as_view(), name='product-export-format'),
+
+    # Асинхронный экспорт
+    path('products/export/async/', AsyncProductExportView.as_view(), name='product-export-async'),
+    path('products/export/download/<str:filename>/', DownloadExportFileView.as_view(), name='product-export-download'),
 ]
