@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_rest_passwordreset',
     'backend',
+    'bootstrap4',
 ]
 
 MIDDLEWARE = [
@@ -122,6 +123,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 AUTH_USER_MODEL = 'backend.User'
 
@@ -170,3 +173,12 @@ CELERY_TASK_TIME_LIMIT = 10 * 60  # 10 минут
 # Настройки для хранения файлов экспорта
 EXPORT_FILES_ROOT = os.path.join(BASE_DIR, 'export_files')
 os.makedirs(EXPORT_FILES_ROOT, exist_ok=True)
+
+
+# Настройка темы админки
+ADMIN_INTERFACE = {
+    'title': 'Магазин Электроники',
+    'logo': 'logo.png',  # положите логотип в static/
+    'favicon': 'favicon.ico',
+    'theme': 'default',  # или 'dark', 'primary'
+}

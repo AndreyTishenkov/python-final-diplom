@@ -1,5 +1,6 @@
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
+from django.contrib import messages
 
 
 class OrderNotificationsMixin:

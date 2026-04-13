@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Магазин Электроники "Тишенков-Shop" - Админ панель</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            margin-bottom: 15px;
+            color: #4a5568;
+        }
+
+        .card p {
+            color: #718096;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .card-btn {
+            display: inline-block;
+            padding: 10px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: opacity 0.3s;
+        }
+
+        .card-btn:hover {
+            opacity: 0.9;
+        }
+
+        .stats {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .stats h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4a5568;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #718096;
+            margin-top: 10px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            color: white;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 32px;
+            }
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🛍️ Магазин Электроники "Тишенков-Shop"</h1>
+        <p>Добро пожаловать в систему управления интернет-магазином</p>
+    </div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="card-icon">📦</div>
+            <h2>Управление заказами</h2>
+            <p>Просмотр, изменение статусов заказов, отправка уведомлений клиентам</p>
+            <a href="/admin/backend/order/" class="card-btn">Перейти к заказам →</a>
+        </div>
+
+        <div class="card">
+            <div class="card-icon">👥</div>
+            <h2>Управление пользователями</h2>
+            <p>Регистрация покупателей и магазинов, управление правами доступа</p>
+            <a href="/admin/backend/user/" class="card-btn">Перейти к пользователям →</a>
+        </div>
+
+        <div class="card">
+            <div class="card-icon">📊</div>
+            <h2>Дашборд</h2>
+            <p>Статистика продаж, аналитика, отчеты по магазину</p>
+            <a href="/admin/dashboard/" class="card-btn">Перейти к дашборду →</a>
+        </div>
+
+        <div class="card">
+            <div class="card-icon">🏪</div>
+            <h2>Товары и категории</h2>
+            <p>Управление ассортиментом, ценами, остатками на складе</p>
+            <a href="/admin/backend/product/" class="card-btn">Перейти к товарам →</a>
+        </div>
+    </div>
+
+    <div class="stats" id="stats">
+        <h2>📈 Статистика магазина</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-number" id="orders-count">-</div>
+                <div class="stat-label">Всего заказов</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="users-count">-</div>
+                <div class="stat-label">Пользователей</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="products-count">-</div>
+                <div class="stat-label">Товаров</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="shops-count">-</div>
+                <div class="stat-label">Магазинов</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© 2026 Магазин Электроники "Тишенков-Shop". Все мои права защищены, я надеюсь.</p>
+        <p>Версия 1.0 | Админская панель: <a href="/admin/" style="color: white;">/admin/</a></p>
+    </div>
+</div>
+
+<script>
+    async function loadStats() {
+        try {
+            // Получаем всю статистику одним запросом
+            const response = await fetch('/api/v1/stats/');
+            const data = await response.json();
+
+            document.getElementById('orders-count').textContent = data.total_orders || 0;
+            document.getElementById('users-count').textContent = data.total_users || 0;
+            document.getElementById('products-count').textContent = data.total_products || 0;
+            document.getElementById('shops-count').textContent = data.active_shops || 0;
+        } catch(e) {
+            console.error('Error loading stats:', e);
+            // Если ошибка, показываем 0 вместо вопроса
+            document.getElementById('orders-count').textContent = '0';
+            document.getElementById('users-count').textContent = '0';
+            document.getElementById('products-count').textContent = '0';
+            document.getElementById('shops-count').textContent = '0';
+        }
+    }
+
+    // Загружаем статистику при загрузке страницы
+    loadStats();
+
+    // Обновляем статистику каждые 30 секунд
+    setInterval(loadStats, 30000);
+</script>
+
+</body>
+</html>

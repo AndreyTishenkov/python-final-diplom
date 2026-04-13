@@ -10,6 +10,7 @@ from django.contrib import messages
 
 from backend.models import User, Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
     Contact, ConfirmEmailToken
+from backend.forms import UserAdminForm
 
 
 @admin.register(User)
@@ -17,6 +18,7 @@ class CustomUserAdmin(UserAdmin):
     """
     Панель управления пользователями
     """
+    form = UserAdminForm
     model = User
 
     fieldsets = (
@@ -27,9 +29,37 @@ class CustomUserAdmin(UserAdmin):
         }),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
+
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'password1', 'password2', 'type', 'first_name', 'last_name', 'is_active', 'is_staff', 'is_superuser'),
+        }),
+    )
+
     list_display = ('email', 'first_name', 'last_name', 'is_staff')
     list_filter = ('type', 'is_active', 'is_staff')
     search_fields = ('email', 'first_name', 'last_name')
+
+    def add_view(self, request, form_url='', extra_context=None):
+        """Переопределяем add_view для дополнительного сообщения"""
+        return super().add_view(request, form_url, extra_context)
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """Переопределяем change_view для дополнительного сообщения"""
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def save_model(self, request, obj, form, change):
+        """Переопределяем save_model для дополнительного сообщения"""
+        try:
+            super().save_model(request, obj, form, change)
+            if not change:
+                messages.success(request, f'Пользователь "{obj.email}" успешно создан.')
+            else:
+                messages.success(request, f'Пользователь "{obj.email}" успешно обновлен.')
+        except Exception as e:
+            messages.error(request, f'Ошибка при сохранении: {str(e)}')
+            raise
 
 
 @admin.register(Shop)

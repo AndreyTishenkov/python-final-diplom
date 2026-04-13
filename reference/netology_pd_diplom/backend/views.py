@@ -12,6 +12,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
 from ujson import loads as load_json
 from yaml import load as load_yaml, Loader
 import json  # Добавлен импорт json
@@ -19,6 +20,7 @@ import csv   # Добавлен импорт csv
 import os
 from datetime import datetime  # Добавлен для работы с датами
 from django.utils import timezone
+from django.shortcuts import render
 
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
     Contact, ConfirmEmailToken, User
@@ -27,6 +29,15 @@ from backend.serializers import UserSerializer, CategorySerializer, ShopSerializ
     OrderItemSerializer, OrderSerializer, ContactSerializer, ProductExportSerializer, ProductExportFullSerializer
 
 from backend.signals import new_user_registered, new_order
+
+
+def index(request):
+    """ Главная страница магазина """
+    return render(request, 'index.html')
+
+def admin_dashboard(request):
+    """Дашборд для админки"""
+    return render(request, 'admin/dashboard.html')
 
 
 class RegisterAccount(APIView):
@@ -1114,3 +1125,28 @@ class CeleryStatusView(APIView):
                 'Error': str(e),
                 'Message': 'Celery worker не запущен. Запустите: celery -A netology_pd_diplom worker --pool=eventlet -l info'
             }, status=503)
+
+
+class PublicStatsView(APIView):
+    """Публичное API для получения статистики главной страницы"""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        # Количество пользователей (только покупатели, не магазины)
+        total_users = User.objects.filter(type='buyer').count()
+
+        # Количество заказов (исключая корзины)
+        total_orders = Order.objects.exclude(state='basket').count()
+
+        # Количество товаров
+        total_products = ProductInfo.objects.count()
+
+        # Количество активных магазинов
+        active_shops = Shop.objects.filter(state=True).count()
+
+        return Response({
+            'total_users': total_users,
+            'total_orders': total_orders,
+            'total_products': total_products,
+            'active_shops': active_shops,
+        })

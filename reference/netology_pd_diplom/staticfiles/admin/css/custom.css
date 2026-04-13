@@ -1,0 +1,61 @@
+/* Кастомные стили для админки */
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --success-color: #27ae60;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+}
+
+#header {
+    background: var(--primary-color);
+    color: white;
+}
+
+#branding h1 {
+    color: white;
+}
+
+.module h2, .module caption {
+    background: var(--secondary-color);
+}
+
+.button, input[type=submit], input[type=button], .submit-row input {
+    background: var(--secondary-color);
+}
+
+.button.default, input[type=submit].default {
+    background: var(--success-color);
+}
+
+/* Статусы заказов */
+.status-new { background: #007bff; color: white; padding: 3px 8px; border-radius: 12px; }
+.status-confirmed { background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; }
+.status-assembled { background: #fd7e14; color: white; padding: 3px 8px; border-radius: 12px; }
+.status-sent { background: #6f42c1; color: white; padding: 3px 8px; border-radius: 12px; }
+.status-delivered { background: #20c997; color: white; padding: 3px 8px; border-radius: 12px; }
+.status-canceled { background: #dc3545; color: white; padding: 3px 8px; border-radius: 12px; }
+
+/* Улучшенные карточки заказов в списке */
+.field-status_badge span {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+/* Кнопки действий */
+.action-button {
+    padding: 5px 10px;
+    border-radius: 5px;
+    text-decoration: none;
+    margin: 2px;
+    display: inline-block;
+}
+
+.action-button.confirm { background: #28a745; color: white; }
+.action-button.cancel { background: #dc3545; color: white; }
+.action-button.assemble { background: #fd7e14; color: white; }
+.action-button.send { background: #17a2b8; color: white; }
+.action-button.deliver { background: #20c997; color: white; }
+.action-button.email { background: #007bff; color: white; }

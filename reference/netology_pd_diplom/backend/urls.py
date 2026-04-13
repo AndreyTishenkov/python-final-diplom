@@ -1,5 +1,6 @@
 from django.urls import path
 from django_rest_passwordreset.views import reset_password_request_token, reset_password_confirm
+from backend.views import index, PublicStatsView
 
 from backend.views import PartnerUpdate, RegisterAccount, LoginAccount, CategoryView, ShopView, ProductInfoView, \
     BasketView, \
@@ -31,4 +32,7 @@ urlpatterns = [
     # Асинхронный экспорт
     path('products/export/async/', AsyncProductExportView.as_view(), name='product-export-async'),
     path('products/export/download/<str:filename>/', DownloadExportFileView.as_view(), name='product-export-download'),
+
+    # Публичная статистика для интернет-магазина
+    path('stats/', PublicStatsView.as_view(), name='public-stats'),
 ]

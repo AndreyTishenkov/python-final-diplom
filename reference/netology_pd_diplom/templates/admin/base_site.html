@@ -1,0 +1,14 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ title }} | Магазин Электроники "Тишенков-Shop"{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">Магазин Электроники "Тишенков-Shop"</a></h1>
+{% endblock %}
+
+{% block nav-global %}
+<div style="margin-left: 20px; display: inline-block;">
+  <a href="/admin/dashboard/" style="color: white; text-decoration: none; margin-left: 20px;">Дашборд</a>
+  <a href="/" style="color: white; text-decoration: none; margin-left: 20px;">На сайт</a>
+</div>
+{% endblock %}
