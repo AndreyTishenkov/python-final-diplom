@@ -97,7 +97,7 @@
 ```
 1. Клонируем репозиторий:
 git clone https://github.com/AndreyTishenkov/python-final-diplom.git
-cd reference\netology_pd_diplom
+cd reference/netology_pd_diplom
 
 2. Создание и активация виртуального окружения
 python3 -m venv venv
@@ -108,7 +108,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 4. Настройка переменных окружения
-Создайте файл .env в корне проекта:
+Создайте файл .env в корне проекта "netology_pd_diplom":
 
 env
 SECRET_KEY=your-secret-key-here
@@ -125,7 +125,7 @@ python manage.py createsuperuser
 
 7. Загрузка тестовых данных
 Загрузка товаров из YAML файла
-python manage.py load_yaml shop1.yaml --user=1
+python manage.py load_yaml export_files/shop1.yaml --user=1
 
 Создание тестовых заказов для админки
 python manage.py create_test_orders
@@ -142,18 +142,21 @@ python manage.py runserver
 API: http://localhost:8000/api/v1/
 
 Запуск Celery (для асинхронных задач)
-Установка и запуск Redis
-sudo apt-get install redis-server  # Linux
-brew install redis                 # Mac
-redis-server
-
-Docker:
-docker run -d -p 6379:6379 --name redis redis
+Установка и запуск Redis в соседем терменале
+sudo apt update
+sudo apt install redis-server -y   # Linux
+sudo systemctl start redis-server
+Проверка того, что redis запущен
+redis-cli ping   --  ответ PONG
 
 Запуск Celery worker
+cd reference/netology_pd_diplom
+source venv/bin/activate
 celery -A netology_pd_diplom worker -l info
 
-Запуск Celery beat (планировщик периодических задач)
+Запуск Celery beat (планировщик периодических задач) в третьем терминале
+cd reference/netology_pd_diplom
+source venv/bin/activate
 celery -A netology_pd_diplom beat -l info
 
 API:
@@ -206,6 +209,33 @@ curl -X POST http://localhost:8000/api/v1/user/register \
   }'
 
 2) Авторизация
+
+Сначала входим в интерактивную строку Django
+python manage.py shell
+
+Затем вставляем код ниже, тем самым создав нового пользователя
+from backend.models import User
+user = User.objects.get(email='ivan@example.com')
+print(f"Email: {user.email}")
+print(f"is_active: {user.is_active}")
+print(f"type: {user.type}")
+print(f"Пароль установлен: {user.has_usable_password()}")
+
+# Принудительно установим флаг активного пользователя
+if not user.is_active:
+    user.is_active = True
+    user.save()
+    print("Пользователь активирован")
+
+# Ещё раз установим пароль
+user.set_password('Test123!')
+user.save()
+print("Пароль установлен заново")
+
+Выходим из Django shell
+exit()
+
+Вводим
 curl -X POST http://localhost:8000/api/v1/user/login \
   -H "Content-Type: application/json" \
   -d '{"email": "ivan@example.com", "password": "Test123!"}'
@@ -220,12 +250,12 @@ curl "http://localhost:8000/api/v1/products/export/json/?shop_id=1" -o products.
 
 --+++  Запуск экспорта
 curl -X POST http://localhost:8000/api/v1/products/export/async/ \
-  -H "Authorization: Token ваш_токен" \
+  -H "Authorization: Token ваш_токен_который_вы_получили_в_пункте_2" \
   -H "Content-Type: application/json" \
   -d '{"format": "json"}'
 
 --+++  Проверка статуса
-curl "http://localhost:8000/api/v1/products/export/async/?task_id=ID_ЗАДАЧИ"
+curl "http://localhost:8000/api/v1/products/export/async/?task_id=TASK_ID_котрый_вы_только_что_получили"
 
 --+++  Управление заказами в админке
 Функционал админки заказов:
@@ -259,10 +289,10 @@ curl "http://localhost:8000/api/v1/stats/"
 Ответ:
 json
 {
-  "total_orders": 10,
-  "total_users": 5,
+  "total_orders": 6,
+  "total_users": 4,
   "total_products": 19,
-  "active_shops": 1
+  "active_shops": 2
 }
 
 2) Админ-дашборд
@@ -275,7 +305,7 @@ json
 Товары с низким остатком
 
 --+++  Тестирование
-Создание тестовых данных
+Создание тестовых данных, если ранее этого не сделали
 python manage.py create_test_orders
 
 Проверка API:
@@ -289,8 +319,8 @@ curl http://localhost:8000/api/v1/shops
 curl http://localhost:8000/api/v1/products
 
 Запуск тестов
+python manage.py shell -c "from backend.tests.test_orders_demo import run; run()"
 
-python manage.py test backend.tests
 Формат YAML файла для импорта товаров
 
 yaml:
