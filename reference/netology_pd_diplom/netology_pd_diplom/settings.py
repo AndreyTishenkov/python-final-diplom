@@ -161,7 +161,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Celery Configuration
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Для Redis
-# CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Альтернатива
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -169,6 +168,15 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 10 * 60  # 10 минут
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-old-exports': {
+        'task': 'backend.tasks.cleanup_old_exports',
+        'schedule': 86400.0,  # раз в сутки (в секундах)
+    },
+}
+
+# Базовый URL для ссылок в письмах
+BASE_URL = 'http://localhost:8000'
 
 # Настройки для хранения файлов экспорта
 EXPORT_FILES_ROOT = os.path.join(BASE_DIR, 'export_files')
