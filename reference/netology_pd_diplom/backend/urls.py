@@ -9,6 +9,10 @@ from backend.views import (
     AsyncUpdatePriceListView, PublicStatsView
 )
 
+from backend.social_auth_views import (
+    SocialAuthRedirectView, SocialAuthCallbackView, SocialAuthExchangeTokenView
+)
+
 app_name = 'backend'
 urlpatterns = [
     # Партнеры
@@ -44,4 +48,9 @@ urlpatterns = [
 
     # Статистика
     path('stats/', PublicStatsView.as_view(), name='public-stats'),
+
+    # Для соцсетей
+    path('auth/redirect/<str:provider>/', SocialAuthRedirectView.as_view(), name='social-auth-redirect'),
+    path('auth/callback/<str:backend>/', SocialAuthCallbackView.as_view(), name='social-auth-callback'),
+    path('auth/exchange/<str:provider>/', SocialAuthExchangeTokenView.as_view(), name='social-auth-exchange'),
 ]

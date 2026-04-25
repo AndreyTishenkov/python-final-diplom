@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'backend',
     'bootstrap4',
     'drf_spectacular',
+    'social_django',
 ]
 
 MIDDLEWARE = [
@@ -53,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'social_django.middleware.SocialAuthExceptionMiddleware',
 ]
 
 ROOT_URLCONF = 'netology_pd_diplom.urls'
@@ -69,6 +71,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'social_django.context_processors.backends',
+                'social_django.context_processors.login_redirect',
             ],
         },
     },
@@ -106,6 +110,14 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+# Бекенды аутентификации в различных соцсетях
+AUTHENTICATION_BACKENDS = (
+    'social_core.backends.google.GoogleOAuth2',     # Google
+    'social_core.backends.github.GithubOAuth2',     # GitHub
+    'social_core.backends.vk.VKOAuth2',             # VK
+    'django.contrib.auth.backends.ModelBackend',    # Стандартная аутентификация
+)
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
@@ -243,3 +255,22 @@ if 'test' in sys.argv:
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         }
     }
+
+# Настройки социальных сетей:
+# URL для перенаправления после успешной авторизации
+LOGIN_REDIRECT_URL = '/'
+LOGIN_URL = '/api/v1/user/login'
+
+# Настройки для провайдеров (замените на свои ключи после регистрации приложений)
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_KEY', '')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET', '')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SCOPE = ['email', 'profile']
+
+SOCIAL_AUTH_GITHUB_KEY = os.getenv('SOCIAL_AUTH_GITHUB_KEY', '')
+SOCIAL_AUTH_GITHUB_SECRET = os.getenv('SOCIAL_AUTH_GITHUB_SECRET', '')
+SOCIAL_AUTH_GITHUB_SCOPE = ['user:email']
+
+# Настройки для создания пользователей из соцсетей
+SOCIAL_AUTH_USER_MODEL = 'backend.User'
+SOCIAL_AUTH_USERNAME_IS_FULL_EMAIL = True  # Использовать email как username
+SOCIAL_AUTH_RAISE_EXCEPTIONS = False

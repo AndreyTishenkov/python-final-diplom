@@ -27,6 +27,9 @@ urlpatterns = [
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
+    # Для соцсетей
+    path('auth/', include('social_django.urls', namespace='social')),
+
     # Основные пути
     path('', index, name="index"),
     path('admin/dashboard/', admin_dashboard, name='admin_dashboard'),
