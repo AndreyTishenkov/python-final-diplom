@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
-import os
+import os, sys
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -155,7 +155,24 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ),
 
+    # Настройка DRF
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+    # Настройки throttling
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',  # для неавторизованных
+        'rest_framework.throttling.UserRateThrottle',   # для авторизованных
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',      # неавторизованные: 100 запросов в день
+        'user': '1000/day',     # авторизованные: 1000 запросов в день
+        'register': '5/hour',   # регистрация: 5 раз в час
+        'login': '10/hour',     # авторизация: 10 раз в час
+        'export': '20/hour',    # экспорт: 20 раз в час
+        'import': '5/hour',     # импорт: 5 раз в час
+        'basket': '200/hour',   # корзина: 200 раз в час
+        'order': '50/hour',     # заказы: 50 раз в час
+    },
 
 }
 
@@ -218,3 +235,11 @@ SPECTACULAR_SETTINGS = {
         },
     },
 }
+
+# Для тестов запуска используем локальный кэш
+if 'test' in sys.argv:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }

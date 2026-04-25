@@ -12,6 +12,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from ujson import loads as load_json
 from yaml import load as load_yaml, Loader
 import json  # Добавлен импорт json
@@ -20,15 +21,27 @@ import os
 from datetime import datetime  # Добавлен для работы с датами
 from django.utils import timezone
 from django.shortcuts import render
-from backend.tasks import async_import_products, async_update_price_list, send_order_status_email
+from backend.tasks import (
+    async_import_products, async_update_price_list, send_order_status_email
+)
 
-from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
-    Contact, ConfirmEmailToken, User
+from backend.models import (
+    Shop, Category, Product, ProductInfo, Parameter, ProductParameter,
+    Order, OrderItem, Contact, ConfirmEmailToken, User
+)
 
-from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
-    OrderItemSerializer, OrderSerializer, ContactSerializer, ProductExportSerializer, ProductExportFullSerializer
+from backend.serializers import (
+    UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer,
+    OrderItemSerializer, OrderSerializer, ContactSerializer, ProductExportSerializer,
+    ProductExportFullSerializer
+)
 
 from backend.signals import new_user_registered, new_order
+
+from backend.throttles import (
+    RegisterThrottle, LoginThrottle, ExportThrottle,
+    ImportThrottle, BasketThrottle, OrderThrottle
+)
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
@@ -61,10 +74,13 @@ class RegisterAccount(APIView):
     Ответ:
     - Status (bool): Успех операции
     - Errors (dict): Ошибки валидации (при неудаче)
+
+    Ограничение: не более 5 регистраций в час с одного IP.
     """
 
-    # Регистрация методом POST
+    throttle_classes = [RegisterThrottle]
 
+    # Регистрация методом POST
     def post(self, request, *args, **kwargs):
         """
         Обрабатывает POST‑запрос и создаёт нового пользователя.
@@ -210,7 +226,11 @@ class LoginAccount(APIView):
     Ответ при ошибке:
     - Status (bool): false
     - Errors (str): Описание ошибки
+
+    Ограничение: не более 10 попыток в час с одного IP для одного email.
     """
+
+    throttle_classes = [LoginThrottle]
 
     @extend_schema(
         summary="Авторизация пользователя",
@@ -356,7 +376,11 @@ class BasketView(APIView):
         - delete: Удалить товар из корзины пользователя.
     Атрибуты:
         - None
+
+    Ограничение: не более 200 операций в час.
     """
+
+    throttle_classes = [BasketThrottle]
 
     # получить корзину
     def get(self, request, *args, **kwargs):
@@ -482,7 +506,12 @@ class PartnerUpdate(APIView):
         - post: Обновление данных партнёра.
     Атрибуты:
         - None
+
+    Ограничение: наследует стандартное ограничение для пользователей.
     """
+
+    # Использует стандартный UserRateThrottle
+    throttle_classes = [UserRateThrottle]
 
     def post(self, request, *args, **kwargs):
         """
@@ -739,7 +768,12 @@ class OrderView(APIView):
         - delete: Удалить конкретный заказ.
     Атрибуты:
         - None
+
+    Ограничение: не более 50 заказов в час.
     """
+
+    throttle_classes = [OrderThrottle]
+
     # получить мои заказы
     def get(self, request, *args, **kwargs):
         """
@@ -820,7 +854,11 @@ class ProductExportView(APIView):
     - max_price: максимальная цена
     - in_stock: только товары в наличии (true/false)
     - format: формат выдачи (json/yaml/csv)
+
+    Ограничение: не более 20 экспортов в час.
     """
+
+    throttle_classes = [ExportThrottle]
 
     def get(self, request, *args, **kwargs):
         """
@@ -985,7 +1023,11 @@ class AsyncProductExportView(APIView):
         "min_price": 1000,
         "in_stock": true
     }
+
+    Ограничение: не более 20 экспортов в час.
     """
+
+    throttle_classes = [ExportThrottle]
 
     def post(self, request, *args, **kwargs):
         """
@@ -1191,7 +1233,13 @@ class PublicStatsView(APIView):
 
 
 class AsyncImportView(APIView):
-    """Асинхронный импорт товаров из YAML"""
+    """
+    Асинхронный импорт товаров из YAML
+
+    Ограничение: не более 5 импортов в час.
+    """
+
+    throttle_classes = [ImportThrottle]
 
     def post(self, request):
         if not request.user.is_authenticated:
