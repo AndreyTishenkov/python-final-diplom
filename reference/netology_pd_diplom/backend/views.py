@@ -1,4 +1,3 @@
-from rest_framework.request import Request
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -6,34 +5,43 @@ from django.core.validators import URLValidator
 from django.db import IntegrityError
 from django.db.models import Q, Sum, F
 from django.http import JsonResponse, HttpResponse, FileResponse
+
 from requests import get
+
+from rest_framework.request import Request
 from rest_framework.authtoken.models import Token
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.parsers import MultiPartParser, FormParser
+
 from ujson import loads as load_json
+
 from yaml import load as load_yaml, Loader
-import json  # Добавлен импорт json
-import csv   # Добавлен импорт csv
-import os
+
+import json, csv, os
+
 from datetime import datetime  # Добавлен для работы с датами
+
 from django.utils import timezone
 from django.shortcuts import render
+
 from backend.tasks import (
     async_import_products, async_update_price_list, send_order_status_email
 )
 
 from backend.models import (
     Shop, Category, Product, ProductInfo, Parameter, ProductParameter,
-    Order, OrderItem, Contact, ConfirmEmailToken, User
+    Order, OrderItem, Contact, ConfirmEmailToken, User, ProductImage
 )
 
 from backend.serializers import (
     UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer,
     OrderItemSerializer, OrderSerializer, ContactSerializer, ProductExportSerializer,
-    ProductExportFullSerializer
+    ProductExportFullSerializer, UserAvatarSerializer, ProductMainImageSerializer,
+    ProductImageSerializer
 )
 
 from backend.signals import new_user_registered, new_order
@@ -41,6 +49,10 @@ from backend.signals import new_user_registered, new_order
 from backend.throttles import (
     RegisterThrottle, LoginThrottle, ExportThrottle,
     ImportThrottle, BasketThrottle, OrderThrottle
+)
+
+from backend.image_processing import (
+    process_user_avatar, process_product_main_image, process_product_gallery_images
 )
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
@@ -54,6 +66,119 @@ def index(request):
 def admin_dashboard(request):
     """Дашборд для админки"""
     return render(request, 'admin/dashboard.html')
+
+
+class UserAvatarUploadView(APIView):
+    """
+    Загрузка аватара пользователя с асинхронной обработкой
+    """
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Требуется вход в систему.'}, status=403)
+
+        serializer = UserAvatarSerializer(request.user, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            # Сохраняем аватар
+            serializer.save()
+
+            # Запускаем асинхронную обработку
+            if request.user.avatar:
+                process_user_avatar.delay(request.user.id, request.user.avatar.path)
+
+            return JsonResponse({
+                'Status': True,
+                'Message': 'Аватар загружен. Началась обработка.',
+                'Data': serializer.data
+            })
+
+        return JsonResponse({'Status': False, 'Errors': serializer.errors}, status=400)
+
+    def get(self, request):
+        """Получение аватара пользователя"""
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Требуется вход в систему.'}, status=403)
+
+        serializer = UserAvatarSerializer(request.user)
+        return Response(serializer.data)
+
+
+class ProductMainImageUploadView(APIView):
+    """
+    Загрузка главного изображения товара
+    """
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, product_id, *args, **kwargs):
+        # Проверка прав (только для магазинов)
+        if not request.user.is_authenticated or request.user.type != 'shop':
+            return JsonResponse({'Status': False, 'Error': 'Доступ запрещен.'}, status=403)
+
+        try:
+            product = Product.objects.get(id=product_id, shop__user_id=request.user.id)
+        except Product.DoesNotExist:
+            return JsonResponse({'Status': False, 'Error': 'Товар не найден.'}, status=404)
+
+        serializer = ProductMainImageSerializer(product, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+
+            if product.main_image:
+                process_product_main_image.delay(product.id, product.main_image.path)
+
+            return JsonResponse({
+                'Status': True,
+                'Message': 'Изображение загружено. Началась обработка.',
+                'Data': serializer.data
+            })
+
+        return JsonResponse({'Status': False, 'Errors': serializer.errors}, status=400)
+
+
+class ProductGalleryImageView(APIView):
+    """
+    Загрузка дополнительных изображений товара
+    """
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, product_id, *args, **kwargs):
+        if not request.user.is_authenticated or request.user.type != 'shop':
+            return JsonResponse({'Status': False, 'Error': 'Доступ запрещен.'}, status=403)
+
+        try:
+            product = Product.objects.get(id=product_id, shop__user_id=request.user.id)
+        except Product.DoesNotExist:
+            return JsonResponse({'Status': False, 'Error': 'Товар не найден.'}, status=404)
+
+        serializer = ProductImageSerializer(data=request.data)
+
+        if serializer.is_valid():
+            product_image = serializer.save(product=product)
+
+            if product_image.image:
+                process_product_gallery_images.delay(product_image.id)
+
+            return JsonResponse({
+                'Status': True,
+                'Message': 'Изображение загружено. Началась обработка.',
+                'Data': serializer.data
+            })
+
+        return JsonResponse({'Status': False, 'Errors': serializer.errors}, status=400)
+
+    def get(self, request, product_id):
+        """Получение всех изображений товара"""
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return JsonResponse({'Status': False, 'Error': 'Товар не найден.'}, status=404)
+
+        images = product.images.all()
+        serializer = ProductImageSerializer(images, many=True)
+        return Response(serializer.data)
 
 
 class RegisterAccount(APIView):

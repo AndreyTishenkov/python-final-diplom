@@ -6,7 +6,8 @@ from backend.views import (
     ProductInfoView, BasketView, AccountDetails, ContactView, OrderView,
     PartnerState, PartnerOrders, ConfirmAccount, ProductExportView,
     AsyncProductExportView, DownloadExportFileView, AsyncImportView,
-    AsyncUpdatePriceListView, PublicStatsView
+    AsyncUpdatePriceListView, PublicStatsView, UserAvatarUploadView,
+    ProductMainImageUploadView, ProductGalleryImageView
 )
 
 from backend.social_auth_views import (
@@ -53,4 +54,9 @@ urlpatterns = [
     path('auth/redirect/<str:provider>/', SocialAuthRedirectView.as_view(), name='social-auth-redirect'),
     path('auth/callback/<str:backend>/', SocialAuthCallbackView.as_view(), name='social-auth-callback'),
     path('auth/exchange/<str:provider>/', SocialAuthExchangeTokenView.as_view(), name='social-auth-exchange'),
+
+    # Загрузка изображений
+    path('user/avatar/', UserAvatarUploadView.as_view(), name='user-avatar'),
+    path('product/<int:product_id>/main-image/', ProductMainImageUploadView.as_view(), name='product-main-image'),
+    path('product/<int:product_id>/gallery/', ProductGalleryImageView.as_view(), name='product-gallery'),
 ]

@@ -8,58 +8,63 @@ from django.conf import settings
 from django.db.models import Sum, F
 from django.contrib import messages
 
-from backend.models import User, Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
-    Contact, ConfirmEmailToken
+from backend.models import (
+    User, Shop, Category, Product, ProductInfo, Parameter, ProductParameter,
+    Order, OrderItem, Contact, ConfirmEmailToken
+)
 from backend.forms import UserAdminForm
 
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     """
-    Панель управления пользователями
+    Панель управления пользователями с отображением аватара
     """
-    form = UserAdminForm
     model = User
 
+    # Поля для отображения в списке
+    list_display = ('email', 'first_name', 'last_name', 'type', 'avatar_preview', 'is_staff', 'is_active')
+
+    # Фильтры
+    list_filter = ('type', 'is_staff', 'is_active')
+
+    # Поля для поиска
+    search_fields = ('email', 'first_name', 'last_name')
+
+    # Поля для отображения на странице редактирования
     fieldsets = (
         (None, {'fields': ('email', 'password', 'type')}),
         ('Personal info', {'fields': ('first_name', 'last_name', 'company', 'position')}),
+        ('Avatar', {'fields': ('avatar', 'avatar_small', 'avatar_medium'), 'classes': ('collapse',)}),
         ('Permissions', {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
 
+    # Поля для формы добавления нового пользователя
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'password1', 'password2', 'type', 'first_name', 'last_name', 'is_active', 'is_staff', 'is_superuser'),
+            'fields': ('email', 'password1', 'password2', 'type', 'first_name', 'last_name', 'is_active', 'is_staff'),
         }),
     )
 
-    list_display = ('email', 'first_name', 'last_name', 'is_staff')
-    list_filter = ('type', 'is_active', 'is_staff')
-    search_fields = ('email', 'first_name', 'last_name')
-
-    def add_view(self, request, form_url='', extra_context=None):
-        """Переопределяем add_view для дополнительного сообщения"""
-        return super().add_view(request, form_url, extra_context)
-
-    def change_view(self, request, object_id, form_url='', extra_context=None):
-        """Переопределяем change_view для дополнительного сообщения"""
-        return super().change_view(request, object_id, form_url, extra_context)
+    def avatar_preview(self, obj):
+        """Отображение миниатюры аватара в списке"""
+        if obj.avatar:
+            return format_html(
+                '<img src="{}" width="40" height="40" style="border-radius: 50%; object-fit: cover;" />',
+                obj.avatar.url
+            )
+        return format_html(
+            '<div style="width:40px; height:40px; background:#ccc; border-radius:50%; display:flex; align-items:center; justify-content:center;">📷</div>'
+        )
+    avatar_preview.short_description = 'Аватар'
 
     def save_model(self, request, obj, form, change):
-        """Переопределяем save_model для дополнительного сообщения"""
-        try:
-            super().save_model(request, obj, form, change)
-            if not change:
-                messages.success(request, f'Пользователь "{obj.email}" успешно создан.')
-            else:
-                messages.success(request, f'Пользователь "{obj.email}" успешно обновлен.')
-        except Exception as e:
-            messages.error(request, f'Ошибка при сохранении: {str(e)}')
-            raise
+        """Сохранение пользователя"""
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(Shop)

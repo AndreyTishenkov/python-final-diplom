@@ -274,3 +274,7 @@ SOCIAL_AUTH_GITHUB_SCOPE = ['user:email']
 SOCIAL_AUTH_USER_MODEL = 'backend.User'
 SOCIAL_AUTH_USERNAME_IS_FULL_EMAIL = True  # Использовать email как username
 SOCIAL_AUTH_RAISE_EXCEPTIONS = False
+
+# Настройки для загрузки файлов
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

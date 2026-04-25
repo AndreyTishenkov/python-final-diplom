@@ -4,6 +4,7 @@ from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_rest_passwordreset.tokens import get_token_generator
+from django.core.validators import FileExtensionValidator
 
 STATE_CHOICES = (
     ('basket', 'Статус корзины'),
@@ -100,6 +101,31 @@ class User(AbstractUser):
         verbose_name_plural = "Список пользователей"
         ordering = ('email',)
 
+    # Добавляем аватар
+    avatar = models.ImageField(
+        verbose_name='Аватар',
+        upload_to='avatars/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'gif'])]
+    )
+
+    # Маленький аватар (будет создаваться асинхронно)
+    avatar_small = models.ImageField(
+        verbose_name='Аватар (маленький)',
+        upload_to='avatars/small/%Y/%m/%d/',
+        blank=True,
+        null=True
+    )
+
+    # Средний аватар (будет создаваться асинхронно)
+    avatar_medium = models.ImageField(
+        verbose_name='Аватар (средний)',
+        upload_to='avatars/medium/%Y/%m/%d/',
+        blank=True,
+        null=True
+    )
+
 
 class Shop(models.Model):
     objects = models.manager.Manager()
@@ -148,6 +174,62 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    # Добавляем главное изображение товара
+    main_image = models.ImageField(
+        verbose_name='Главное изображение',
+        upload_to='products/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])]
+    )
+
+    # Миниатюры (будут создаваться асинхронно)
+    thumbnail_small = models.ImageField(
+        verbose_name='Миниатюра (150x150)',
+        upload_to='products/thumbnails/small/',
+        blank=True,
+        null=True
+    )
+
+    thumbnail_medium = models.ImageField(
+        verbose_name='Миниатюра (300x300)',
+        upload_to='products/thumbnails/medium/',
+        blank=True,
+        null=True
+    )
+
+    thumbnail_large = models.ImageField(
+        verbose_name='Миниатюра (600x600)',
+        upload_to='products/thumbnails/large/',
+        blank=True,
+        null=True
+    )
+
+
+class ProductImage(models.Model):
+    """Дополнительные изображения товара (галерея)"""
+    product = models.ForeignKey(
+        Product,
+        verbose_name='Товар',
+        related_name='images',
+        on_delete=models.CASCADE
+    )
+    image = models.ImageField(
+        verbose_name='Изображение',
+        upload_to='products/gallery/%Y/%m/%d/',
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])]
+    )
+    thumbnail_small = models.ImageField(upload_to='products/gallery/thumbnails/small/', blank=True, null=True)
+    thumbnail_medium = models.ImageField(upload_to='products/gallery/thumbnails/medium/', blank=True, null=True)
+    is_main = models.BooleanField(default=False, verbose_name='Главное изображение')
+    order = models.PositiveIntegerField(default=0, verbose_name='Порядок')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'Изображение товара'
+        verbose_name_plural = 'Изображения товаров'
 
 
 class ProductInfo(models.Model):

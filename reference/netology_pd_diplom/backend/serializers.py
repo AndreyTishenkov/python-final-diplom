@@ -1,8 +1,10 @@
 # Верстальщик
 from rest_framework import serializers
 
-from backend.models import User, Category, Shop, ProductInfo, Product, ProductParameter, OrderItem, Order, Contact
-
+from backend.models import (
+    User, Category, Shop, ProductInfo, Product, ProductParameter, OrderItem,
+    Order, Contact, ProductImage
+)
 
 class ContactSerializer(serializers.ModelSerializer):
     class Meta:
@@ -165,3 +167,30 @@ class ProductExportFullSerializer(serializers.ModelSerializer):
             total=Sum(F('quantity') * F('product_info__price'))
         )['total']
         return revenue or 0
+
+
+class UserAvatarSerializer(serializers.ModelSerializer):
+    """Сериализатор для загрузки аватара"""
+
+    class Meta:
+        model = User
+        fields = ('avatar', 'avatar_small', 'avatar_medium')
+        read_only_fields = ('avatar_small', 'avatar_medium')
+
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    """Сериализатор для изображений товара"""
+
+    class Meta:
+        model = ProductImage
+        fields = ('id', 'image', 'thumbnail_small', 'thumbnail_medium', 'is_main', 'order')
+        read_only_fields = ('id', 'thumbnail_small', 'thumbnail_medium')
+
+
+class ProductMainImageSerializer(serializers.ModelSerializer):
+    """Сериализатор для главного изображения товара"""
+
+    class Meta:
+        model = Product
+        fields = ('main_image', 'thumbnail_small', 'thumbnail_medium', 'thumbnail_large')
+        read_only_fields = ('thumbnail_small', 'thumbnail_medium', 'thumbnail_large')
