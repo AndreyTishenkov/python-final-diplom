@@ -20,7 +20,7 @@ import os
 from datetime import datetime  # Добавлен для работы с датами
 from django.utils import timezone
 from django.shortcuts import render
-from backend.tasks import async_import_products, async_update_price_list
+from backend.tasks import async_import_products, async_update_price_list, send_order_status_email
 
 
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
@@ -698,6 +698,11 @@ class OrderView(APIView):
                     if is_updated:
                         new_order.send(sender=self.__class__, user_id=request.user.id)
                         return JsonResponse({'Status': True})
+
+        if is_updated:
+            # Асинхронная отправка вместо синхронного сигнала
+            new_order.send(sender=self.__class__, user_id=request.user.id, order_id=request.data['id'])
+            return JsonResponse({'Status': True})
 
         return JsonResponse({'Status': False, 'Errors': 'Не указаны все необходимые аргументы'})
 

@@ -561,3 +561,117 @@ def cleanup_old_exports():
         if file_modified < cutoff:
             os.remove(filepath)
             print(f"Удален старый файл: {filename}")
+
+
+@shared_task
+def send_registration_email(user_id, token_key):
+    """Асинхронная отправка письма с подтверждением регистрации"""
+    try:
+        user = User.objects.get(id=user_id)
+
+        subject = f"Подтверждение регистрации в Интернет-магазине 'Тишенков-Shop'"
+        message = f"""
+            Здравствуйте, {user.first_name or user.email}!
+
+            Для подтверждения регистрации используйте токен:
+            {token_key}
+
+            Или перейдите по ссылке:
+            {settings.BASE_URL}/api/v1/user/register/confirm
+
+            С уважением,
+            Интернет-магазин "Тишенков-Shop"
+            """
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=message,
+            from_email=settings.EMAIL_HOST_USER,
+            to=[user.email]
+        )
+        email.send()
+        return {'status': 'success', 'user_id': user_id}
+    except Exception as e:
+        return {'status': 'error', 'error': str(e)}
+
+
+@shared_task
+def send_password_reset_email(user_id, token_key):
+    """Асинхронная отправка письма для сброса пароля"""
+    try:
+        user = User.objects.get(id=user_id)
+
+        subject = f"Сброс пароля в Интернет-магазине 'Тишенков-Shop'"
+        message = f"""
+            Здравствуйте, {user.first_name or user.email}!
+
+            Для сброса пароля используйте токен:
+            {token_key}
+
+            С уважением,
+            Интернет-магазин "Тишенков-Shop"
+            """
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=message,
+            from_email=settings.EMAIL_HOST_USER,
+            to=[user.email]
+        )
+        email.send()
+        return {'status': 'success', 'user_id': user_id}
+    except Exception as e:
+        return {'status': 'error', 'error': str(e)}
+
+
+@shared_task
+def send_order_status_email(order_id, old_status, new_status):
+    """Асинхронная отправка письма об изменении статуса заказа"""
+    try:
+        order = Order.objects.get(id=order_id)
+        user = order.user
+
+        status_names = {
+            'new': 'Новый',
+            'confirmed': 'Подтвержден',
+            'assembled': 'Собран',
+            'sent': 'Отправлен',
+            'delivered': 'Доставлен',
+            'canceled': 'Отменен',
+        }
+
+        # Формируем список товаров
+        items_list = ""
+        total = 0
+        for item in order.ordered_items.select_related('product_info__product'):
+            item_total = item.quantity * item.product_info.price
+            total += item_total
+            items_list += f"- {item.product_info.product.name} x{item.quantity} = {item_total} ₽\n"
+
+        subject = f"Статус заказа #{order.id} изменен"
+        message = f"""
+            Здравствуйте, {user.first_name or user.email}!
+
+            Статус вашего заказа #{order.id} изменен.
+
+            Предыдущий статус: {status_names.get(old_status, old_status)}
+            Новый статус: {status_names.get(new_status, new_status)}
+
+            Состав заказа:
+            {items_list}
+            ИТОГО: {total} ₽
+
+            С уважением,
+            Интернет-магазин "Тишенков-Shop"
+            """
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=message,
+            from_email=settings.EMAIL_HOST_USER,
+            to=[user.email]
+        )
+        email.send()
+        return {'status': 'success', 'order_id': order_id}
+    except Exception as e:
+        return {'status': 'error', 'error': str(e)}
