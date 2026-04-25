@@ -22,7 +22,6 @@ from django.utils import timezone
 from django.shortcuts import render
 from backend.tasks import async_import_products, async_update_price_list, send_order_status_email
 
-
 from backend.models import Shop, Category, Product, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
     Contact, ConfirmEmailToken, User
 
@@ -30,6 +29,9 @@ from backend.serializers import UserSerializer, CategorySerializer, ShopSerializ
     OrderItemSerializer, OrderSerializer, ContactSerializer, ProductExportSerializer, ProductExportFullSerializer
 
 from backend.signals import new_user_registered, new_order
+
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.types import OpenApiTypes
 
 
 def index(request):
@@ -43,7 +45,22 @@ def admin_dashboard(request):
 
 class RegisterAccount(APIView):
     """
-    Для регистрации покупателей
+    Регистрация нового пользователя.
+
+    Создаёт нового пользователя с ролью 'покупатель'.
+    На указанный email отправляется токен подтверждения.
+
+    Параметры запроса:
+    - first_name (str): Имя пользователя
+    - last_name (str): Фамилия пользователя
+    - email (str): Email (используется как логин)
+    - password (str): Пароль (должен быть сложным)
+    - company (str): Компания (необязательно)
+    - position (str): Должность (необязательно)
+
+    Ответ:
+    - Status (bool): Успех операции
+    - Errors (dict): Ошибки валидации (при неудаче)
     """
 
     # Регистрация методом POST
@@ -178,8 +195,47 @@ class AccountDetails(APIView):
 
 class LoginAccount(APIView):
     """
-    Класс для авторизации пользователей
+    Авторизация пользователя.
+
+    Возвращает токен для аутентификации в последующих запросах.
+
+    Параметры запроса:
+    - email (str): Email пользователя
+    - password (str): Пароль
+
+    Ответ при успехе:
+    - Status (bool): true
+    - Token (str): Токен авторизации
+
+    Ответ при ошибке:
+    - Status (bool): false
+    - Errors (str): Описание ошибки
     """
+
+    @extend_schema(
+        summary="Авторизация пользователя",
+        description="Авторизует пользователя и возвращает токен для последующих запросов",
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'email': {'type': 'string', 'format': 'email'},
+                    'password': {'type': 'string', 'format': 'password'},
+                },
+                'required': ['email', 'password']
+            }
+        },
+        responses={
+            200: OpenApiResponse(description='Успешная авторизация', response={
+                'type': 'object',
+                'properties': {
+                    'Status': {'type': 'boolean'},
+                    'Token': {'type': 'string'},
+                }
+            }),
+            401: OpenApiResponse(description='Ошибка авторизации'),
+        }
+    )
 
     # Авторизация методом POST
     def post(self, request, *args, **kwargs):
@@ -222,12 +278,38 @@ class ShopView(ListAPIView):
 
 class ProductInfoView(APIView):
     """
-    Класс, реализующий функционал поиска товаров.
+    Просмотр товаров с фильтрацией.
+
+    Параметры фильтрации:
+    - shop_id (int): ID магазина
+    - category_id (int): ID категории
+    - min_price (int): Минимальная цена
+    - max_price (int): Максимальная цена
+    - in_stock (bool): Только товары в наличии
+
+    Возвращает список товаров с параметрами.
+
     Доступные методы:
         - get: Возвращает информацию о товарах с применением указанных фильтров.
     Атрибуты:
         - None
     """
+
+    @extend_schema(
+        summary="Получить список товаров",
+        description="Возвращает список товаров с возможностью фильтрации по магазину, категории и цене",
+        parameters=[
+            OpenApiParameter(name='shop_id', description='ID магазина', required=False, type=int),
+            OpenApiParameter(name='category_id', description='ID категории', required=False, type=int),
+            OpenApiParameter(name='min_price', description='Минимальная цена', required=False, type=int),
+            OpenApiParameter(name='max_price', description='Максимальная цена', required=False, type=int),
+            OpenApiParameter(name='in_stock', description='Только товары в наличии', required=False, type=bool),
+        ],
+        responses={
+            200: ProductInfoSerializer(many=True),
+            400: OpenApiResponse(description='Неверные параметры запроса'),
+        }
+    )
 
     def get(self, request: Request, *args, **kwargs):
         """
@@ -260,7 +342,13 @@ class ProductInfoView(APIView):
 
 class BasketView(APIView):
     """
-    Класс для управления корзиной пользователя.
+    Управление корзиной пользователя.
+
+    Формат данных для POST:
+    {
+        "items": "[{\"product_info\": 1, \"quantity\": 2}]"
+    }
+
     Методы:
         - get: Получить товары в корзине пользователя.
         - post: Добавить товар в корзину пользователя.

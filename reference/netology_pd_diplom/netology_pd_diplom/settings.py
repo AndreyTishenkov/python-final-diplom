@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django_rest_passwordreset',
     'backend',
     'bootstrap4',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -154,6 +155,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ),
 
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -189,4 +192,29 @@ ADMIN_INTERFACE = {
     'logo': 'logo.png',  # положите логотип в static/
     'favicon': 'favicon.ico',
     'theme': 'default',  # или 'dark', 'primary'
+}
+
+# Настройки для DRF-Spectacular
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Интернет-магазин API',
+    'DESCRIPTION': 'API для интернет-магазина электроники. Поддерживает управление заказами, товарами, корзиной и аутентификацию.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+    },
+    'SECURITY': [
+        {'tokenAuth': []},
+    ],
+    'SECURITY_SCHEMES': {
+        'tokenAuth': {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'Authorization',
+            'description': 'Token-авторизация. Формат: Token <ваш_токен>',
+        },
+    },
 }

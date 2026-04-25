@@ -33,7 +33,8 @@ class UserManager(BaseUserManager):
 
     def _create_user(self, email, password, **extra_fields):
         """
-        Create and save a user with the given username, email, and password.
+        Создайте и сохраните пользователя с указанным именем пользователя,
+        адресом электронной почты и паролем.
         """
         if not email:
             raise ValueError('The given email must be set')
@@ -75,18 +76,18 @@ class User(AbstractUser):
     username = models.CharField(
         _('username'),
         max_length=150,
-        help_text=_('Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.'),
+        help_text=_('Внимание!. Не более 150 символов. Только буквы, цифры и символы @/./+/-/_ .'),
         validators=[username_validator],
         error_messages={
-            'unique': _("A user with that username already exists."),
+            'unique': _("Пользователь с таким именем пользователя уже существует."),
         },
     )
     is_active = models.BooleanField(
         _('active'),
         default=False,
         help_text=_(
-            'Designates whether this user should be treated as active. '
-            'Unselect this instead of deleting accounts.'
+            'Указывает на то, что следует ли считать этого пользователя активным.'
+            'Вместо удаления учетных записей снимите этот флажок.'
         ),
     )
     type = models.CharField(verbose_name='Тип пользователя', choices=USER_TYPE_CHOICES, max_length=5, default='buyer')
@@ -271,19 +272,19 @@ class ConfirmEmailToken(models.Model):
 
     @staticmethod
     def generate_key():
-        """ generates a pseudo random code using os.urandom and binascii.hexlify """
+        """ Генерирует псевдослучайный код, используя os.urandom и binascii.hexlify. """
         return get_token_generator().generate_token()
 
     user = models.ForeignKey(
         User,
         related_name='confirm_email_tokens',
         on_delete=models.CASCADE,
-        verbose_name=_("The User which is associated to this password reset token")
+        verbose_name=_("Пользователь, связанный с этим токеном сброса пароля.")
     )
 
     created_at = models.DateTimeField(
         auto_now_add=True,
-        verbose_name=_("When was this token generated")
+        verbose_name=_("Когда был сгенерирован этот токен")
     )
 
     # Key field, though it is not the primary key of the model
@@ -300,4 +301,4 @@ class ConfirmEmailToken(models.Model):
         return super(ConfirmEmailToken, self).save(*args, **kwargs)
 
     def __str__(self):
-        return "Password reset token for user {user}".format(user=self.user)
+        return "Токен для сброса пароля пользователя {user}".format(user=self.user)

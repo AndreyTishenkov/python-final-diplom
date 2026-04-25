@@ -15,6 +15,15 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+
+    """
+    Сериализатор для модели пользователя.
+
+    Используется для:
+    - Регистрации нового пользователя
+    - Просмотра и редактирования профиля
+    """
+
     contacts = ContactSerializer(read_only=True, many=True)
 
     class Meta:
@@ -78,6 +87,16 @@ class OrderItemCreateSerializer(OrderItemSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
+
+    """
+    Сериализатор для модели заказа.
+
+    Включает:
+    - Список товаров в заказе
+    - Общую сумму
+    - Информацию о контакте
+    """
+
     ordered_items = OrderItemCreateSerializer(read_only=True, many=True)
 
     total_sum = serializers.IntegerField()
