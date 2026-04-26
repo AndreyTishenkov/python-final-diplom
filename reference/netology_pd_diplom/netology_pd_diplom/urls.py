@@ -36,6 +36,7 @@ urlpatterns = [
     path('', index, name="index"),
     path('admin/dashboard/', admin_dashboard, name='admin_dashboard'),
     path('admin/', admin.site.urls),
+    path('silk/', include('silk.urls', namespace='silk')),
     path('api/v1/', include('backend.urls', namespace='backend')),
 ]
 

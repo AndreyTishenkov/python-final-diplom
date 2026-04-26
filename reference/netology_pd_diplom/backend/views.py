@@ -1106,22 +1106,38 @@ class ProductExportView(APIView):
         return response
 
     def export_csv(self, queryset, request, detailed=False):
-        """Экспорт в CSV"""
+        """
+        Экспорт товаров в CSV (оптимизированная версия)
+        """
+        from django.db.models import Prefetch
+
+        # ОПТИМИЗАЦИЯ: подгружаем связанные данные одним запросом
+        optimized_queryset = queryset.select_related(
+            'product',           # подгружаем товар
+            'product__category', # подгружаем категорию товара
+            'shop',              # подгружаем магазин
+        ).prefetch_related(
+            Prefetch(
+                'product_parameters',
+                queryset=ProductParameter.objects.select_related('parameter')
+            )
+        )
+
         response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename="products_export_{timezone.now().date()}.csv"'
 
         writer = csv.writer(response)
 
         if detailed:
-            # Заголовки для расширенного экспорта
             writer.writerow([
                 'ID', 'External ID', 'Название товара', 'Категория', 'Модель',
                 'Магазин', 'Количество', 'Цена', 'РРЦ', 'Заказано', 'Выручка', 'Параметры'
             ])
 
-            for item in queryset:
-                # Собираем параметры в строку
-                params = '; '.join([f"{p.parameter.name}: {p.value}" for p in item.product_parameters.all()])
+            for item in optimized_queryset:
+                # теперь параметры уже загружены, нет N+1 проблемы!
+                params = '; '.join([f"{p.parameter.name}: {p.value}"
+                                    for p in item.product_parameters.all()])
 
                 writer.writerow([
                     item.id,
@@ -1138,15 +1154,14 @@ class ProductExportView(APIView):
                     params
                 ])
         else:
-            # Заголовки для простого экспорта
             writer.writerow([
                 'ID', 'External ID', 'Название товара', 'Категория', 'Модель',
                 'Магазин', 'Количество', 'Цена', 'РРЦ', 'Параметры'
             ])
 
-            for item in queryset:
-                # Собираем параметры в строку
-                params = '; '.join([f"{p.parameter.name}: {p.value}" for p in item.product_parameters.all()])
+            for item in optimized_queryset:
+                params = '; '.join([f"{p.parameter.name}: {p.value}"
+                                    for p in item.product_parameters.all()])
 
                 writer.writerow([
                     item.id,

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'social_django',
     'cacheops',
+    'silk',
 ]
 
 MIDDLEWARE = [
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
     'backend.middleware.SentryUserContextMiddleware',
+    'silk.middleware.SilkyMiddleware',
 ]
 
 ROOT_URLCONF = 'netology_pd_diplom.urls'
@@ -348,3 +350,10 @@ CACHEOPS = {
     'backend.Order': None,
     'backend.OrderItem': None,
 }
+
+
+# Настройки Silk
+SILKY_PYTHON_PROFILER = True  # включить профилирование Python
+SILKY_MAX_RECORDED_REQUESTS = 100  # хранить 100 последних запросов
+SILKY_AUTHENTICATION = True  # требовать авторизацию
+SILKY_AUTHORISATION = True
