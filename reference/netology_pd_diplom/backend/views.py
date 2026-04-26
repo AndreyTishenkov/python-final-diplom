@@ -5,6 +5,9 @@ from django.core.validators import URLValidator
 from django.db import IntegrityError
 from django.db.models import Q, Sum, F
 from django.http import JsonResponse, HttpResponse, FileResponse
+from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
+from django.utils.decorators import method_decorator
 
 from requests import get
 
@@ -414,6 +417,11 @@ class CategoryView(ListAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
+    @method_decorator(cache_page(60 * 60 * 24))  # кэш на 24 часа
+    @method_decorator(vary_on_headers('Authorization'))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
 
 class ShopView(ListAPIView):
     """
@@ -421,6 +429,10 @@ class ShopView(ListAPIView):
     """
     queryset = Shop.objects.filter(state=True)
     serializer_class = ShopSerializer
+
+    @method_decorator(cache_page(60 * 60 * 6))  # кэш на 6 часов
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
 
 
 class ProductInfoView(APIView):
@@ -438,9 +450,16 @@ class ProductInfoView(APIView):
 
     Доступные методы:
         - get: Возвращает информацию о товарах с применением указанных фильтров.
+
     Атрибуты:
         - None
     """
+
+    @method_decorator(cache_page(60 * 30))  # кэш на 30 минут
+    @method_decorator(vary_on_headers('Authorization'))
+    def dispatch(self, *args, **kwargs):
+        """Переопределяем dispatch для применения декораторов кэширования"""
+        return super().dispatch(*args, **kwargs)
 
     @extend_schema(
         summary="Получить список товаров",
@@ -457,34 +476,59 @@ class ProductInfoView(APIView):
             400: OpenApiResponse(description='Неверные параметры запроса'),
         }
     )
-
     def get(self, request: Request, *args, **kwargs):
         """
         Получить данные о товарах по фильтрам.
+
         Входные данные:
             - request (Request): запрос Django.
+
         Выходные данные:
             - Response: ответ с информацией о товарах.
         """
-        query = Q(shop__state=True)
+        # Получаем параметры фильтрации
         shop_id = request.query_params.get('shop_id')
         category_id = request.query_params.get('category_id')
+        min_price = request.query_params.get('min_price')
+        max_price = request.query_params.get('max_price')
+        in_stock = request.query_params.get('in_stock')
 
+        # Строим базовый запрос (только активные магазины)
+        query = Q(shop__state=True)
+
+        # Применяем фильтры
         if shop_id:
             query = query & Q(shop_id=shop_id)
 
         if category_id:
             query = query & Q(product__category_id=category_id)
 
-        # фильтруем и отбрасываем дуликаты
+        if min_price:
+            query = query & Q(price__gte=min_price)
+
+        if max_price:
+            query = query & Q(price__lte=max_price)
+
+        # Фильтруем и отбрасываем дубликаты
         queryset = ProductInfo.objects.filter(
-            query).select_related(
-            'shop', 'product__category').prefetch_related(
-            'product_parameters__parameter').distinct()
+            query
+        ).select_related(
+            'shop', 'product__category'
+        ).prefetch_related(
+            'product_parameters__parameter'
+        ).distinct()
+
+        # Применяем фильтр по наличию (после всех остальных)
+        if in_stock and in_stock.lower() == 'true':
+            queryset = queryset.filter(quantity__gt=0)
 
         serializer = ProductInfoSerializer(queryset, many=True)
 
-        return Response(serializer.data)
+        # Добавляем заголовок с информацией о кэше
+        response = Response(serializer.data)
+        response['X-Cache-Key'] = f"products_{shop_id}_{category_id}_{min_price}_{max_price}_{in_stock}"
+
+        return response
 
 
 class BasketView(APIView):

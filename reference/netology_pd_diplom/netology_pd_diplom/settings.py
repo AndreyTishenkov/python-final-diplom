@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'bootstrap4',
     'drf_spectacular',
     'social_django',
+    'cacheops',
 ]
 
 MIDDLEWARE = [
@@ -301,3 +302,49 @@ if SENTRY_DSN:
             sentry_sdk.capture_message("Sentry инициализирован в режиме DEBUG", level="info")
     else:
         print("[Sentry] SDK already initialized, skipping...")
+
+
+# Настройка Redis для кэша (отдельная БД от Celery)
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://localhost:6379/1',  # БД 1 для кэша (Celery использует БД 0)
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_CLASS': 'redis.BlockingConnectionPool',
+            'CONNECTION_POOL_CLASS_KWARGS': {
+                'max_connections': 50,
+                'timeout': 20,
+            },
+            'MAX_CONNECTIONS': 1000,
+            'PICKLE_VERSION': -1,
+        },
+        'KEY_PREFIX': 'myapp',
+        'TIMEOUT': 300,  # 5 минут по умолчанию
+    }
+}
+
+CACHEOPS_REDIS = "redis://localhost:6379/1"
+
+# Указываем, какие модели и как кэшировать
+CACHEOPS = {
+    # Категории - кэшируем всё на 1 день (редко меняются)
+    'backend.Category': {'ops': 'all', 'timeout': 60*60*24},
+
+    # Магазины - кэшируем всё на 6 часов
+    'backend.Shop': {'ops': 'all', 'timeout': 60*60*6},
+
+    # Товары - кэшируем GET запросы на 1 час
+    'backend.Product': {'ops': 'get', 'timeout': 60*60},
+    'backend.ProductInfo': {'ops': 'fetch', 'timeout': 60*60},
+
+    # Параметры товаров - редко меняются
+    'backend.Parameter': {'ops': 'all', 'timeout': 60*60*24},
+
+    # Пользователи - только одиночные запросы на 15 минут
+    'backend.User': {'ops': 'get', 'timeout': 60*15},
+
+    # Заказы - НЕ кэшируем (слишком часто меняются)
+    'backend.Order': None,
+    'backend.OrderItem': None,
+}
