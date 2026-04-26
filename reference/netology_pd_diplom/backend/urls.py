@@ -7,7 +7,8 @@ from backend.views import (
     PartnerState, PartnerOrders, ConfirmAccount, ProductExportView,
     AsyncProductExportView, DownloadExportFileView, AsyncImportView,
     AsyncUpdatePriceListView, PublicStatsView, UserAvatarUploadView,
-    ProductMainImageUploadView, ProductGalleryImageView
+    ProductMainImageUploadView, ProductGalleryImageView, TestErrorView,
+    DatabaseErrorView, PerformanceTestView,
 )
 
 from backend.social_auth_views import (
@@ -59,4 +60,10 @@ urlpatterns = [
     path('user/avatar/', UserAvatarUploadView.as_view(), name='user-avatar'),
     path('product/<int:product_id>/main-image/', ProductMainImageUploadView.as_view(), name='product-main-image'),
     path('product/<int:product_id>/gallery/', ProductGalleryImageView.as_view(), name='product-gallery'),
+
+    # Sentry тестовые эндпоинты
+    path('test-error/', TestErrorView.as_view(), name='test-error'),
+    path('test-error/<str:error_type>/', TestErrorView.as_view(), name='test-error-type'),
+    path('test-db-error/', DatabaseErrorView.as_view(), name='test-db-error'),
+    path('test-performance/', PerformanceTestView.as_view(), name='test-performance'),
 ]

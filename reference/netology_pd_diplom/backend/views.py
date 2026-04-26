@@ -21,7 +21,7 @@ from ujson import loads as load_json
 
 from yaml import load as load_yaml, Loader
 
-import json, csv, os
+import json, csv, os, logging, sentry_sdk
 
 from datetime import datetime  # Добавлен для работы с датами
 
@@ -58,6 +58,8 @@ from backend.image_processing import (
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 from drf_spectacular.types import OpenApiTypes
 
+
+logger = logging.getLogger(__name__)
 
 def index(request):
     """ Главная страница магазина """
@@ -1425,3 +1427,112 @@ def strtobool(val):
         return False
     else:
         raise ValueError(f"Invalid boolean value: {val}")
+
+
+class TestErrorView(APIView):
+    """
+    Тестовый эндпоинт для проверки работы Sentry.
+
+    Различные типы ошибок для демонстрации:
+    - ZeroDivisionError: /error/zero/
+    - ValueError: /error/value/
+    - KeyError: /error/key/
+    - IndexError: /error/index/
+    - Custom exception: /error/custom/
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, error_type='zero'):
+        """
+        Генерирует различные типы исключений для тестирования Sentry.
+
+        Параметры:
+        - error_type: zero, value, key, index, custom, log, warning
+        """
+
+        if error_type == 'zero':
+            # Деление на ноль
+            result = 1 / 0
+            return Response({'result': result})
+
+        elif error_type == 'value':
+            # Ошибка значения
+            int('not_a_number')
+            return Response({'success': True})
+
+        elif error_type == 'key':
+            # Отсутствующий ключ в словаре
+            data = {'name': 'Test'}
+            value = data['nonexistent_key']
+            return Response({'value': value})
+
+        elif error_type == 'index':
+            # Индекс вне диапазона
+            items = [1, 2, 3]
+            value = items[10]
+            return Response({'value': value})
+
+        elif error_type == 'custom':
+            # Пользовательское исключение
+            raise Exception('Это тестовое исключение для Sentry!')
+
+        elif error_type == 'log':
+            # Отправка сообщения в Sentry без исключения
+            try:
+                raise ValueError('Тестовое бизнес-исключение')
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                return Response({
+                    'status': 'error',
+                    'message': 'Ошибка залогирована в Sentry',
+                    'error_type': type(e).__name__
+                })
+
+        elif error_type == 'warning':
+            # Отправка предупреждения в Sentry
+            sentry_sdk.capture_message('Тестовое предупреждение из API', level='warning')
+            return Response({
+                'status': 'warning',
+                'message': 'Предупреждение отправлено в Sentry'
+            })
+
+        else:
+            return Response({
+                'message': 'Тестовый эндпоинт для Sentry',
+                'available_error_types': ['zero', 'value', 'key', 'index', 'custom', 'log', 'warning'],
+                'example': '/api/v1/test-error/zero/'
+            })
+
+
+class DatabaseErrorView(APIView):
+    """
+    Тест ошибки базы данных
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from django.db import connection
+
+        # Выполняем несуществующий SQL запрос
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT * FROM nonexistent_table_12345")
+
+        return Response({'status': 'ok'})
+
+
+class PerformanceTestView(APIView):
+    """
+    Тест производительности для Sentry (медленный запрос)
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        import time
+
+        # Симулируем медленную операцию
+        time.sleep(2)
+
+        return Response({
+            'status': 'ok',
+            'message': 'Медленный запрос (2 секунды) - Sentry должен зафиксировать'
+        })

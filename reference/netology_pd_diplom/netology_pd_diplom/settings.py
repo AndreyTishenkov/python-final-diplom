@@ -10,9 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
-import os, sys
+import os, sys, sentry_sdk
 from dotenv import load_dotenv
 load_dotenv()
+from sentry_sdk.integrations.django import DjangoIntegration
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
+    'backend.middleware.SentryUserContextMiddleware',
 ]
 
 ROOT_URLCONF = 'netology_pd_diplom.urls'
@@ -278,3 +280,24 @@ SOCIAL_AUTH_RAISE_EXCEPTIONS = False
 # Настройки для загрузки файлов
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Настройки для SENTRY
+SENTRY_DSN = os.getenv('SENTRY_DSN', '')
+
+if SENTRY_DSN:
+    # Проверяем, не инициализирован ли уже SDK
+    if not sentry_sdk.get_client().is_active():
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=0.5 if not DEBUG else 1.0,
+            send_default_pii=True,
+            environment=os.getenv('SENTRY_ENVIRONMENT', 'development'),
+            release='1.0.0',
+            debug=DEBUG,  # Включаем debug только при DEBUG=True
+        )
+
+        if DEBUG:
+            sentry_sdk.capture_message("Sentry инициализирован в режиме DEBUG", level="info")
+    else:
+        print("[Sentry] SDK already initialized, skipping...")

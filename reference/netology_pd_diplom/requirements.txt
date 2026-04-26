@@ -11,3 +11,4 @@ redis~=5.0.0
 curl~=8.5.0
 drf-spectacular~=0.29.0
 social_auth_app_django~=5.8.0
+sentry-sdk~=2.58.0
